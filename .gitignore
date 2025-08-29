@@ -1,1 +1,8 @@
+# local development testing scripts
 testing/
+
+# test MNIST dataset
+tests/data/
+
+# environment variables
+.env
