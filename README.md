@@ -12,13 +12,15 @@ After running the models, the trained models' pickle files can be found in the "
 
 Save the pickled models in the [`models`](models/) directory, downloaded after training the models.
 
+It is recommended to create a separate *venv* or *Conda* environment to use for training (if done locally) and testing to avoid dependency conflicts.
+
 Testing the models can be done using the respective notebooks in the [`tests`](tests/) directory. 
 
 ## Architecture
 
 The proposed architecture encompasses a pipeline of models that analyze and process the image in an attempt to correctly classify adversarial and clean images.
 
-![alt text](public/image.png)
+![alt text](public/architecture_revision_0.png)
 
 ### Models
 
