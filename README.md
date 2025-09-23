@@ -20,7 +20,7 @@ Testing the models can be done using the respective notebooks in the [`tests`](t
 
 The proposed architecture encompasses a pipeline of models that analyze and process the image in an attempt to correctly classify adversarial and clean images.
 
-![alt text](public/architecture_revision_0.png)
+![alt text](public/architecture_revision_1.png)
 
 ### Models
 
