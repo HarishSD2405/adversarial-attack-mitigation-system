@@ -12,6 +12,10 @@
 - Multi-stage defensive pipeline to protect Convolutional Neural Network (CNN) from adversarial attacks
 - Modular architecture for detecting, purifying and classifying input images
 
+## Datasets
+- MNIST - Dataset of 70,000 28x28 grayscale hadnwritten digits. Used for its simplicity which provides an ideal environment for initial prototyping and proof-of-concept validation.
+- CIFAR-10 - More challenging dataset of 60,000 32x32 colour images across 10 object classes. Used to test the generalizability and scalibility of our proposed model architecture so far.
+
 ### Workflow
 
 1. Input: Submit an image to the System via API Gateway
@@ -95,7 +99,32 @@
         - For Detection Model - 128 input features and 2 output features ("clean" or "adversarial")
         - Softmax activation function to produce probabilities for each output class
 
-## Training Process and Hyperparameters
+## Model Architecture Used: ResNet
+
+- Use of a more advanced model like ResNet is to achieve a higher performance baseline on more complex datasets like CIFAR-10. This provides a more realistic and challenging testbed for our defense methodology and demonstrates its scalability. The key innovation of ResNet is the use of "skip connections" to enable the training of much deeper networks.
+
+- Detailed Architecture (ResNet-18)
+    - Input: 3 x 32 x 32 three-channel color image.
+
+    - Initial CNN Layer: A single 3x3 convolutional layer followed by Batch Normalization and ReLU.
+        - Reason: To perform the initial, low-level feature extraction from the color image and create a base set of feature maps.
+
+    - Residual Blocks (Series of 4 Stages): The core of the network. Each block contains two convolutional layers, with Batch Normalization and ReLU activations, plus a "skip connection".
+        - Skip Connection: The input to a block is added directly to the output of the block's convolutional layers.
+        - Reason: The skip connection is the key innovation that solves the vanishing gradient problem in very deep networks. It allows the gradient to flow more easily through the layers during backpropagation, making it possible to train networks with dozens or even hundreds of layers. This enables the model to learn much more complex and hierarchical features than a simple CNN.
+
+    - Global Average Pooling Layer:
+        - Reason: Averages each final feature map down to a single value. This drastically reduces the number of parameters in the model, makes it more computationally efficient, and acts as a strong regularizer to prevent overfitting.
+
+    - Fully Connected (Output) Layer: A single linear layer that produces the final classification scores.
+        - Reason: The final decision-making layer that maps the high-level, abstract features learned by the residual blocks to the output classes.
+
+    - Output Layer
+        - For Baseline and Mitigation Models: Output features for 10 classes (e.g., 'airplane', 'dog', 'cat' for CIFAR-10).
+        - For Detection Model: Output features for 2 classes ("clean" or "adversarial").
+        - Softmax activation function to produce probabilities for each output class.
+
+## Training Process and Hyperparameters - CNN for MNIST
 
 1. Common Setup
 - Data Preprocessing - Transforming all MNIST (train=True) images to convert them to PyTorch tensors and then normalize with a mean=0.1307 and standard deviation=0.3801
@@ -121,8 +150,35 @@
 - Process: SimpleCNN trained for 20 epochs where in each set the model learns to classify correctly adversarial examples that are generated on-the-go with strong PGD configuration (eps=0.2)
 - Output: To ['mitigation_model.pth'](../models/mitigation_model.pth)
 
+## Training Process and Hyperparameters - ResNet for MNIST
+
+1. Common Setup
+- Data Preprocessing - Transforming all MNIST (train=True) images to convert them to PyTorch tensors and then normalize with a mean=0.1307 and standard deviation=0.3081.
+- Batch Size - 128 for all training processes.
+- Learning Rate - A starting rate of 0.001 was used for the baseline model with a scheduler. A smaller rate (e.g., 0.0001) was used for the mitigation model to ensure training stability.
+
+2. Baseline Model Training (ResNet)
+- Objective: To create a standard, high-performance, NON-robust classifier using a ResNet architecture.
+- Dataset: Clean MNIST training set.
+- Process: Standard supervised training for 10 epochs, utilizing a learning rate scheduler to improve convergence.
+- Output: To ['baseline_model_resnet.pth'](../models/baseline_model_resnet.pth)
+
+3. Detection Model Training (ResNet)
+- Objective: Train a Binary Classifier using a ResNet architecture to detect adversarial examples.
+- Dataset Generation: Custom dataset built by attacking the ResNet baseline model with a PGD attack (eps=0.09).
+    - clean MNIST images used as "Clean" and labeled with 0
+    - adversarial versions used as "Adversarial" with label 1
+- Process: The ResNet is trained as a binary classifier on the custom dataset for 15 epochs.
+- Output: To ['detection_model_resnet.pth'](../models/detection_model_resnet.pth)
+
+4. Mitigation Model Training (ResNet)
+- Objective: To build a hardened ResNet classifier against PGD attacks on MNIST.
+- Process: ResNet model trained for 20-30 epochs using Adversarial Training. In each step, the model learns to correctly classify adversarial examples generated on-the-go with a strong PGD configuration (eps=0.1). A low learning rate was critical for training stability.
+- Output: To ['mitigation_model_resnet.pth'](../models/mitigation_model_resnet.pth)
+
 ## Model Testing and Performance Analysis
 
+### Version 0 - Using CNN on MNIST
 - Final validation conducted on the unseen MNIST test data (train=False) using very strong PGD attack (eps=0.3)
 
 1. Evaluation of the Detection System
@@ -144,3 +200,24 @@
     - A robust model, trained adversarially, learns a much smoother and simpler decision boundary with a large buffer zone. This makes it excellent at resisting adversarial attacks, as the small push is no longer enough to cross the wide margin.
     - A clean but "atypical" data point (like an unusual but valid handwritten digit) might be misclassified because the new, smoother boundary no longer has the specific curve needed to include it. In essence, the model gives up a little bit of precision on these edge cases to gain a huge amount of stability against malicious attacks.
 
+### Version 1 - Using ResNet on MNIST
+- Final validation was conducted on the unseen MNIST test data. Adversarial examples were sourced from a pre-generated static dataset created with a PGD attack (`adv_test_dataset_pgd015.npy`), indicating a test epsilon of 0.15.
+
+1. Baseline Model vs Mitigation Model
+
+- ResNet Baseline Model Performance
+    - On clean data, the model achieved a high accuracy of 98.89%.
+    - On adversarial data, the model's performance collapsed, achieving an accuracy of only 9.74%.
+    - Inference: This confirms that even a powerful, standard-trained ResNet architecture is extremely vulnerable to PGD attacks.
+
+- ResNet Mitigation Model Performance
+    - On adversarial data, the model demonstrated significant robustness, maintaining a high accuracy of 72.41%.
+    - On clean data, the model achieved an accuracy of 99.33%.
+    - Inference: This is the key success of the project. The mitigation model is highly effective at neutralizing an attack that cripples the standard baseline model.
+
+2. Analysis and Key Inferences
+
+- Vindication of Adversarial Training: The massive performance gap on adversarial data (from 9.74% to 72.41%) is validation that the adversarial training methodology was successful in creating a robust classifier.
+
+- Unusual Accuracy-Robustness Trade-off: Contrary to the previous trade-off observed in the CNN model where robustness comes at the cost of clean-data accuracy, our ResNet mitigation model (99.33%) actually performed better on clean data than the baseline model (98.89%).
+    - Inference: This suggests that the advanced adversarial training method we used (TRADES) was highly effective at managing the trade-off.
