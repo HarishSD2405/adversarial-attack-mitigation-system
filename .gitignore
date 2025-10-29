@@ -7,6 +7,6 @@ tests/data/
 # environment variables
 .env
 
-.DS_Store
+**/.DS_Store
 
 **/models/
