@@ -8,3 +8,5 @@ tests/data/
 .env
 
 .DS_Store
+
+**/models/
